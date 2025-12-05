@@ -1,7 +1,5 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, Bot, RefreshCw, AlertCircle, WifiOff } from 'lucide-react';
+import { Send, X, Bot, RefreshCw, AlertCircle, WifiOff, Loader } from 'lucide-react';
 import { getChatModel } from '../services/geminiService';
 import { ChatMessage, Transaction, Wallet, TransactionType } from '../types';
 import { TRANSLATIONS, Language } from '../data/locales';
@@ -58,11 +56,14 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
         }]);
       } catch (e: any) {
         console.error("Failed to init chat", e);
-        setSessionError(e.message || "Failed to initialize AI.");
+        const errorMsg = e.message?.includes('API Key') 
+            ? "Error: API Key missing or invalid."
+            : "Failed to initialize AI.";
+        setSessionError(errorMsg);
         setMessages([{
           id: 'error',
           role: 'model',
-          text: "Error: API Key missing or service unavailable.",
+          text: errorMsg,
           timestamp: new Date()
         }]);
       }
@@ -71,13 +72,13 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   // Handle Language Change
   useEffect(() => {
-    if (chatSession && prevLangRef.current !== lang && isOnline) {
-      const languageName = (TRANSLATIONS[lang] as any)._lang_name || 'English';
-      chatSession.sendMessage(`[SYSTEM] User switched language to ${languageName}. Reply in ${languageName}.`)
-        .catch(console.error);
+    if (prevLangRef.current !== lang && isOnline) {
+      setChatSession(null);
+      setMessages([]);
+      setSessionError(null);
       prevLangRef.current = lang;
     }
-  }, [lang, chatSession, isOnline]);
+  }, [lang, isOnline]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,7 +99,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   const handleGetTransactions = (args: any) => {
     let filtered = [...transactions];
-    // Safe checks for args
     if (args?.startDate) {
       const start = new Date(args.startDate);
       if (!isNaN(start.getTime())) filtered = filtered.filter(t => new Date(t.date) >= start);
@@ -140,10 +140,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
       );
       if (found) targetWallet = found;
     }
-    if (!targetWallet) {
-       if (wallets.length === 1) targetWallet = wallets[0];
-       else return { error: "Ambiguous wallet. Ask user to specify which wallet." };
-    }
     
     let date = new Date();
     if (args?.date) {
@@ -175,7 +171,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !chatSession || !isOnline) return;
+    if (!input.trim() || !chatSession || !isOnline || isProcessing || sessionError) return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -189,16 +185,20 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
     setIsProcessing(true);
 
     try {
-      let result = await chatSession.sendMessage(userMsg.text);
+      // 1. Send User Message
+      let result = await chatSession.sendMessage({
+          parts: [{ text: userMsg.text }],
+          role: 'user'
+      });
+      
       let turns = 0;
       
-      // Handle Multi-Turn Function Calling Loop
+      // 2. Tool Loop
       while (result.functionCalls && result.functionCalls.length > 0 && turns < 5) {
         turns++;
-        const functionCalls = result.functionCalls;
         const functionResponses = [];
         
-        for (const call of functionCalls) {
+        for (const call of result.functionCalls) {
           let responseData;
           try {
             console.log(`Calling tool: ${call.name}`, call.args);
@@ -220,7 +220,8 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           });
         }
         
-        // Send tool outputs back to model
+        // CRITICAL FIX: Use 'sendMessage' for tool responses. 
+        // 'sendMessageGenerativeContent' is not a valid method on the ChatSession object.
         result = await chatSession.sendMessage(functionResponses);
       }
       
@@ -233,10 +234,14 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
       }]);
     } catch (error: any) {
       console.error("Chat Error", error);
+      const errorMsg = error.message?.includes('ContentUnion is required') 
+          ? "Format Error: Content sent was invalid. Check the tool responses."
+          : "Sorry, I encountered an error connecting to the AI service. Please try again.";
+          
       setMessages(prev => [...prev, {
         id: Date.now().toString() + '_error',
         role: 'model',
-        text: "Sorry, I encountered an error connecting to the AI service. Please try again.",
+        text: errorMsg,
         timestamp: new Date()
       }]);
     } finally {
@@ -328,7 +333,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           {isProcessing && (
             <div className="flex justify-start animate-fade-in">
                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-none px-3 py-2 shadow-sm flex items-center space-x-2">
-                  <RefreshCw className="w-3 h-3 text-indigo-500 animate-spin" />
+                  <Loader className="w-3 h-3 text-indigo-500 animate-spin" />
                   <span className="text-[10px] text-slate-500 dark:text-slate-400">{t.chat_thinking}</span>
                </div>
             </div>
