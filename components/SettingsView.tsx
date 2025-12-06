@@ -1,7 +1,10 @@
+
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Member } from '../types';
 import { TRANSLATIONS, Language } from '../data/locales';
-import { Users, Plus, Trash2, UserCircle, Mail, AlertTriangle, RefreshCw, Camera, Save, X, Heart, CheckCircle, Loader } from 'lucide-react';
+import { Users, Plus, Trash2, UserCircle, Mail, AlertTriangle, RefreshCw, Camera, Save, X, Heart, CheckCircle, Loader, Crown } from 'lucide-react';
 
 interface SettingsViewProps {
   members: Member[];
@@ -26,7 +29,7 @@ const Notification: React.FC<{ message: string; type: 'success' | 'error' | 'inf
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers, lang, onResetData }) => {
   const t = TRANSLATIONS[lang];
-  const currentUser = members[0];
+  const currentUser = members[0]; // Assume first member is always the primary user
 
   // 1. Profil State
   const [profileName, setProfileName] = useState(currentUser?.name || '');
@@ -51,12 +54,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
       setProfileName(currentUser.name);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]); // Only update if the user ID changes to prevent overwrite during typing
+  }, [currentUser?.id, currentUser?.name]); // Only update if the user ID or name changes to prevent overwrite during typing
 
 
   // --- Profile Handlers ---
   const handleUpdateProfile = () => {
-    if (!currentUser || isSaving || !profileName.trim()) return;
+    if (!currentUser || isSaving || !profileName.trim() || profileName.trim() === currentUser.name) return;
 
     setIsSaving(true);
     setTimeout(() => {
@@ -64,7 +67,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
           idx === 0 ? { ...m, name: profileName.trim() } : m
         );
         setMembers(updatedMembers);
-        showNotification(t.profile_updated || 'Profil mis à jour !', 'success');
+        showNotification(t.profile_updated, 'success');
         setIsSaving(false);
     }, 500);
   };
@@ -79,7 +82,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
           idx === 0 ? { ...m, avatar: base64String } : m
         );
         setMembers(updatedMembers);
-        showNotification(t.change_avatar || 'Avatar mis à jour.', 'success');
+        showNotification(t.profile_updated, 'success'); // Re-using profile_updated for avatar
       };
       reader.readAsDataURL(file);
     }
@@ -89,7 +92,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
     e.preventDefault();
     e.stopPropagation();
     
-    // Explicitly NO confirmation dialog here as requested
     if (!currentUser) return;
 
     const updatedMembers = members.map((m, idx) => {
@@ -103,7 +105,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
     setMembers(updatedMembers);
     
     if (fileInputRef.current) fileInputRef.current.value = '';
-    showNotification(t.remove_avatar || 'Avatar supprimé.', 'info');
+    showNotification(t.remove_avatar, 'info');
   };
 
   // --- Member Handlers ---
@@ -116,14 +118,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
         id: Date.now().toString(),
         name: name,
         email: email,
-        role: 'editor'
+        role: 'editor',
+        isAdmin: false, 
+        isPremium: false,
       };
       setMembers([...members, newMember]);
 
       if (email) {
-        showNotification(`${t.invite_sent || 'Invitation envoyée à'} ${email}`, 'info');
+        showNotification(`${t.invite_sent} ${email}`, 'info');
       } else {
-        showNotification(`${name} ajouté.`, 'success');
+        showNotification(`${name} ${t.member_added}`, 'success');
       }
       setNewMemberName('');
       setNewMemberEmail('');
@@ -132,12 +136,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
 
   const handleRemoveMember = (id: string, name: string) => {
     if (members.length > 1) {
-      if (window.confirm(t.delete_confirm || `Êtes-vous sûr de vouloir supprimer ${name} ?`)) {
+      if (window.confirm(t.delete_confirm)) { 
         setMembers(members.filter(m => m.id !== id));
-        showNotification(`${name} a été retiré.`, 'error');
+        showNotification(`${name} ${t.member_removed}`, 'error');
       }
     } else {
-      showNotification('Impossible de supprimer le seul membre restant (Admin).', 'error');
+      showNotification(t.cannot_remove_last_member, 'error');
     }
   };
 
@@ -151,7 +155,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
     return (
       <div className="text-center p-8 text-rose-500 dark:text-rose-400">
         <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
-        <p>Erreur: Impossible de charger le profil utilisateur.</p>
+        <p>{t.error_loading_profile}</p>
       </div>
     );
   }
@@ -218,6 +222,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
                 onChange={(e) => setProfileName(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
               />
+            </div>
+            <div className="flex items-center space-x-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.premium_status_label}:</span>
+                <span className="flex items-center text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full">
+                    <Crown className="w-3 h-3 mr-1" /> {t.is_creator}
+                </span>
             </div>
             <button 
               onClick={handleUpdateProfile}
@@ -302,10 +312,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
                   <div>
                     <p className="font-medium text-slate-800 dark:text-white">{member.name}</p>
                     {member.email && <p className="text-xs text-slate-500 flex items-center"><Mail className="w-3 h-3 mr-1" />{member.email}</p>}
-                    {index === 0 && <span className="text-xs text-indigo-500 font-medium">Admin</span>}
+                    <span className="flex items-center text-xs text-slate-500 dark:text-slate-400">
+                        <UserCircle className="w-3 h-3 mr-1" />
+                        <span>{t.member}</span>
+                    </span>
                   </div>
                 </div>
-                {index !== 0 && (
+                {index !== 0 && ( // Admin (first member) cannot remove themselves
                   <button 
                     onClick={() => handleRemoveMember(member.id, member.name)}
                     className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"

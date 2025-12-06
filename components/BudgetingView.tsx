@@ -1,3 +1,6 @@
+
+
+
 import React, { useState } from 'react';
 import { Transaction, TransactionType, BudgetMethod, BudgetLimit } from '../types';
 import { TRANSLATIONS, Language } from '../data/locales';
@@ -13,7 +16,7 @@ interface BudgetingViewProps {
 }
 
 export const BudgetingView: React.FC<BudgetingViewProps> = ({ 
-  transactions, lang, budgetMethod, setBudgetMethod, budgetLimits, setBudgetLimits 
+  transactions, lang, budgetMethod, setBudgetMethod, budgetLimits, setBudgetLimits
 }) => {
   const t = TRANSLATIONS[lang];
   const [editingCategory, setEditingCategory] = useState<string | null>(null);

@@ -15,7 +15,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const t = TRANSLATIONS[lang];
   const getWallet = (id: string) => wallets.find(w => w.id === id);
 
-  if (transactions.length === 0) {
+  if (!transactions || transactions.length === 0) { // Added null/undefined check for transactions
     return (
       <div className="flex flex-col items-center justify-center py-10 text-slate-500 dark:text-slate-400">
         <p>{t.no_transactions}</p>
@@ -67,7 +67,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                     e.stopPropagation();
                     onDelete(t.id);
                   }}
-                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-all opacity-100"
                   title="Delete Transaction"
                   aria-label="Delete Transaction"
                 >

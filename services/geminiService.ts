@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, FunctionDeclaration, Type, Tool } from "@google/genai";
 import { Transaction, Wallet } from "../types";
 
@@ -121,6 +122,7 @@ export const generateFinancialInsight = async (
       Respond in ${targetLang}. Use Markdown.
     `;
 
+    // Fix: Using `contents` directly instead of a nested object, and passing `systemInstruction` in `config`.
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
@@ -150,6 +152,7 @@ export const getChatModel = (lang: string = 'en') => {
     - Today's Date: ${now.toLocaleDateString()}
     - Current ISO Time: ${now.toISOString()}
     - Language Requirement: You must communicate fluently and naturally in ${targetLanguage}.
+    - Current User Role: Creator (all features unlocked).
   `;
 
   return ai.chats.create({

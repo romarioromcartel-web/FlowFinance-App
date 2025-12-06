@@ -3,20 +3,39 @@ import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Transaction, Wallet, TransactionType, DateRange } from '../types';
 import { TransactionList } from './TransactionList';
-import { Plus, Wallet as WalletIcon } from 'lucide-react';
+import { Plus, Wallet as WalletIcon, Calendar } from 'lucide-react';
 import { TRANSLATIONS, Language } from '../data/locales';
 
 interface DashboardProps {
   wallets: Wallet[];
   transactions: Transaction[];
   dateRange: DateRange;
+  setDateRange: (range: DateRange) => void; // Added setDateRange
   onAddWallet: () => void;
   lang: Language;
   onDeleteTransaction?: (id: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dateRange, onAddWallet, lang, onDeleteTransaction }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dateRange, setDateRange, onAddWallet, lang, onDeleteTransaction }) => {
   const t = TRANSLATIONS[lang];
+
+  // Calculate total balance across all wallets
+  const totalWalletsBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
+
+  // Helper to format date for input[type="date"]
+  const formatDateForInput = (date: Date) => date.toISOString().split('T')[0];
+
+  // Handle date range changes
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = new Date(e.target.value);
+    setDateRange({ ...dateRange, start: newStartDate });
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEndDate = new Date(e.target.value);
+    setDateRange({ ...dateRange, end: newEndDate });
+  };
+
 
   // Empty State
   if (wallets.length === 0) {
@@ -44,9 +63,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dat
   const filteredTransactions = transactions
     .filter(t => {
       const d = new Date(t.date);
+      // Ensure transaction date is within the selected range (inclusive)
       return d >= dateRange.start && d <= dateRange.end;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Calculate total expenses for the filtered period
+  const totalExpenses = filteredTransactions
+    .filter(t => t.type === TransactionType.EXPENSE)
+    .reduce((sum, t) => sum + t.amount, 0);
 
   // Calculate Totals - Grouped by Currency
   const totalsByCurrency = wallets.reduce((acc, wallet) => {
@@ -54,7 +79,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dat
     if (!acc[currency]) {
       acc[currency] = { balance: 0, income: 0, expense: 0 };
     }
-    acc[currency].balance += wallet.balance;
+    // Only sum individual wallet balances, totalWalletsBalance is separate
+    // acc[currency].balance += wallet.balance; 
     return acc;
   }, {} as Record<string, { balance: number, income: number, expense: number }>);
 
@@ -64,6 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dat
     if (wallet) {
       const currency = wallet.currency;
       if (!totalsByCurrency[currency]) {
+        // This should theoretically not happen if wallet exists but currency wasn't added to totalsByCurrency before
         totalsByCurrency[currency] = { balance: 0, income: 0, expense: 0 }; 
       }
       if (tx.type === TransactionType.INCOME) totalsByCurrency[currency].income += tx.amount;
@@ -103,11 +130,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ wallets, transactions, dat
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Total Balances Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white dark:bg-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{t.total_final_balance}</p>
+          {wallets.length > 0 ? (
+            <h2 className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">
+              {wallets[0].currency} {totalWalletsBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </h2>
+          ) : (
+            <h2 className="text-3xl font-bold text-slate-500 dark:text-slate-400 mt-2">
+              N/A
+            </h2>
+          )}
+        </div>
+        <div className="bg-white dark:bg-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{t.total_final_expenses} ({t.period})</p>
+          {wallets.length > 0 ? (
+            <h2 className="text-3xl font-bold text-rose-500 dark:text-rose-400 mt-2">
+              {wallets[0].currency} {totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </h2>
+          ) : (
+            <h2 className="text-3xl font-bold text-slate-500 dark:text-slate-400 mt-2">
+              N/A
+            </h2>
+          )}
+        </div>
+      </div>
+
+      {/* Date Range Selector */}
+      <div className="bg-white dark:bg-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+        <h3 className="text-slate-900 dark:text-white font-semibold mb-4 flex items-center space-x-2">
+          <Calendar className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <span>{t.select_date_range}</span>
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="startDate" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t.start_date}</label>
+            <input
+              type="date"
+              id="startDate"
+              value={formatDateForInput(dateRange.start)}
+              onChange={handleStartDateChange}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2.5 px-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+          <div>
+            <label htmlFor="endDate" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t.end_date}</label>
+            <input
+              type="date"
+              id="endDate"
+              value={formatDateForInput(dateRange.end)}
+              onChange={handleEndDateChange}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2.5 px-3 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+
+      {/* Individual Currency Totals (Original Section - modified) */}
       {Object.entries(totalsByCurrency).map(([curr, stats]: [string, { balance: number, income: number, expense: number }]) => (
         <div key={curr} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
              <div className="bg-white dark:bg-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{t.total_balance} ({curr})</p>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white mt-2">{curr} {stats.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-white mt-2">{curr} {wallets.filter(w => w.currency === curr).reduce((sum, w) => sum + w.balance, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
             </div>
             <div className="bg-white dark:bg-card p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{t.income} ({t.period})</p>

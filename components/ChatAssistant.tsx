@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, Bot, RefreshCw, AlertCircle, WifiOff, Loader } from 'lucide-react';
 import { getChatModel } from '../services/geminiService';
@@ -15,7 +17,7 @@ interface ChatAssistantProps {
 }
 
 export const ChatAssistant: React.FC<ChatAssistantProps> = ({ 
-  isOpen, onClose, wallets, transactions, onAddTransaction, lang 
+  isOpen, onClose, wallets, transactions, onAddTransaction, lang
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -187,8 +189,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
     try {
       // 1. Send User Message
       let result = await chatSession.sendMessage({
-          parts: [{ text: userMsg.text }],
-          role: 'user'
+          message: userMsg.text,
       });
       
       let turns = 0;
@@ -214,15 +215,19 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           functionResponses.push({
             functionResponse: {
               name: call.name,
-              id: call.id,
+              id: call.id, 
               response: responseData
             }
           });
         }
         
         // CRITICAL FIX: Use 'sendMessage' for tool responses. 
-        // 'sendMessageGenerativeContent' is not a valid method on the ChatSession object.
-        result = await chatSession.sendMessage(functionResponses);
+        // Tool responses need to be encapsulated in a message object with `toolResponses`.
+        result = await chatSession.sendMessage({
+          message: {
+            toolResponses: functionResponses.map(fr => fr.functionResponse)
+          }
+        });
       }
       
       const responseText = result.text;

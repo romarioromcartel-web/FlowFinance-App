@@ -8,7 +8,6 @@ import {
   Plus, 
   Menu, 
   X,
-  Sparkles,
   Globe,
   Calculator,
   MessageSquare,
@@ -18,7 +17,8 @@ import {
   Settings,
   WifiOff,
   UserCircle,
-  Heart
+  Heart,
+  Crown
 } from 'lucide-react';
 import { Transaction, Wallet, ViewState, DateRange, TransactionType, Theme, BudgetMethod, BudgetLimit, Member } from './types';
 import { WalletCard } from './components/WalletCard';
@@ -29,15 +29,16 @@ import { Dashboard } from './components/Dashboard';
 import { AccountingView } from './components/AccountingView';
 import { BudgetingView } from './components/BudgetingView';
 import { SettingsView } from './components/SettingsView';
-import { ChatAssistant } from './components/ChatAssistant';
+import { ChatAssistant } from './components/ChatAssistant'; 
 import { TRANSLATIONS, Language } from './data/locales';
 
-// Persistence Helper
+// Persistence Helper (Simplified for single-user)
 const loadFromStorage = <T,>(key: string, fallback: T): T => {
   try {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : fallback;
   } catch (e) {
+    console.warn(`Error loading from storage for key ${key}:`, e);
     return fallback;
   }
 };
@@ -51,15 +52,37 @@ const saveToStorage = (key: string, data: any) => {
 };
 
 const App: React.FC = () => {
-  // State initialization with Persistence
-  const [wallets, setWallets] = useState<Wallet[]>(() => loadFromStorage('flow_wallets', []));
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadFromStorage('flow_transactions', []));
-  
-  // Budget & Members
-  const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>(() => loadFromStorage('flow_budget_method', 'FREE'));
-  const [budgetLimits, setBudgetLimits] = useState<BudgetLimit[]>(() => loadFromStorage('flow_budget_limits', []));
-  const [members, setMembers] = useState<Member[]>(() => loadFromStorage('flow_members', [{ id: '1', name: 'Me', role: 'admin' }]));
+  // Data states (single user, implicitly Creator/Admin/Premium)
+  const [wallets, setWallets] = useState<Wallet[]>(() => 
+    loadFromStorage('flow_wallets', [])
+  );
+  const [transactions, setTransactions] = useState<Transaction[]>(() => 
+    loadFromStorage('flow_transactions', [])
+  );
+  const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>(() => 
+    loadFromStorage('flow_budget_method', 'FREE')
+  );
+  const [budgetLimits, setBudgetLimits] = useState<BudgetLimit[]>(() => 
+    loadFromStorage('flow_budget_limits', [])
+  );
+  const [members, setMembers] = useState<Member[]>(() => {
+    const loadedMembers = loadFromStorage('flow_members', []);
+    if (loadedMembers.length === 0) {
+      // Initialize single 'Creator' user
+      return [{ 
+        id: '1', 
+        name: 'Me', 
+        email: 'romarioromcartel@gmail.com', // Default creator email (for reference, not login)
+        role: 'admin',
+        isAdmin: true, 
+        isPremium: true 
+      }];
+    }
+    // Ensure the single user always has admin/premium status
+    return loadedMembers.map((m, idx) => idx === 0 ? { ...m, isAdmin: true, isPremium: true } : m);
+  });
 
+  // UI States
   const [view, setView] = useState<ViewState>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [lang, setLang] = useState<Language>(() => loadFromStorage('flow_lang', 'en'));
@@ -78,14 +101,24 @@ const App: React.FC = () => {
   });
 
   const t = TRANSLATIONS[lang];
-  const currentUser = members[0]; // Assuming first member is 'Me'
+  
+  // Current user is always the first member (the Creator)
+  const currentUser: Member = members[0]; 
 
-  // Persistence Effects
+  // --- Persistence Effects ---
   useEffect(() => saveToStorage('flow_wallets', wallets), [wallets]);
   useEffect(() => saveToStorage('flow_transactions', transactions), [transactions]);
   useEffect(() => saveToStorage('flow_budget_method', budgetMethod), [budgetMethod]);
   useEffect(() => saveToStorage('flow_budget_limits', budgetLimits), [budgetLimits]);
-  useEffect(() => saveToStorage('flow_members', members), [members]);
+  useEffect(() => {
+    // Ensure the primary member (index 0) is always admin/premium when saving
+    const updatedMembersForSave = members.map((m, idx) => 
+      idx === 0 ? { ...m, isAdmin: true, isPremium: true } : m
+    );
+    saveToStorage('flow_members', updatedMembersForSave);
+  }, [members]);
+
+  // Global settings (not user-specific)
   useEffect(() => saveToStorage('flow_lang', lang), [lang]);
   useEffect(() => saveToStorage('flow_theme', theme), [theme]);
 
@@ -118,7 +151,6 @@ const App: React.FC = () => {
   };
 
   const handleAddTransaction = (newTx: Omit<Transaction, 'id'>) => {
-    // Robustness: ensure amount is a number
     const numericAmount = typeof newTx.amount === 'string' ? parseFloat(newTx.amount) : newTx.amount;
     
     const tx: Transaction = { 
@@ -166,21 +198,22 @@ const App: React.FC = () => {
   };
 
   const handleResetData = () => {
-    // Avoid setting state to [] to prevent useEffects from overwriting cleared storage
-    // Directly clear storage and reload
-    const keys = [
-      'flow_wallets', 
-      'flow_transactions', 
-      'flow_budget_limits', 
-      'flow_members', 
-      'flow_budget_method',
-      // We purposefully DO NOT clear 'flow_lang' and 'flow_theme' to improve UX after reset
-    ];
-    
-    keys.forEach(key => localStorage.removeItem(key));
-
-    // Reloading immediately ensures the app starts fresh from empty storage
-    window.location.reload();
+    if (window.confirm(t.reset_confirm)) {
+      const keys = [
+        'flow_wallets', 
+        'flow_transactions', 
+        'flow_budget_limits', 
+        'flow_members', 
+        'flow_budget_method',
+        'flow_lang', // Also reset global settings if doing a full reset
+        'flow_theme'
+      ];
+      
+      keys.forEach(key => localStorage.removeItem(key));
+  
+      // Reloading immediately ensures the app starts fresh from empty storage
+      window.location.reload();
+    }
   };
 
   const handleAddWallet = (newWallet: Omit<Wallet, 'id'>) => {
@@ -191,7 +224,7 @@ const App: React.FC = () => {
   // Sidebar Component
   const Sidebar = () => (
     <div className={`
-      fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-transform duration-300 transform 
+      fixed inset-y-0 left-0 z-40 w-60 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-transform duration-300 transform 
       ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:relative flex flex-col
     `}>
       <div className="flex flex-col p-6 border-b border-slate-200 dark:border-slate-800">
@@ -204,26 +237,29 @@ const App: React.FC = () => {
            </button>
         </div>
         
-        {/* User Profile Summary */}
-        <div className="flex items-center space-x-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
-            {currentUser?.avatar ? (
-              <img src={currentUser.avatar} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400">
-                <UserCircle className="w-6 h-6" />
+        {/* User Profile Summary (Always Creator) */}
+        {currentUser && (
+          <div className="flex items-center space-x-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400">
+                  <UserCircle className="w-6 h-6" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                {currentUser?.name || "Me"}
+              </p>
+              <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
+                <Crown className="w-3 h-3 text-purple-400 mr-1" />
+                <span>{t.is_creator}</span>
               </div>
-            )}
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-              {currentUser?.name || 'User'}
-            </p>
-            <p className="text-xs text-slate-500 truncate">
-               {isOnline ? 'Online' : 'Offline'}
-            </p>
-          </div>
-        </div>
+        )}
       </div>
       
       <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
@@ -260,16 +296,11 @@ const App: React.FC = () => {
                onChange={(e) => setLang(e.target.value as Language)}
                className="bg-transparent text-xs font-medium focus:outline-none cursor-pointer w-full text-slate-900 dark:text-slate-100"
              >
-               <option value="en" className="bg-white dark:bg-slate-900">English</option>
-               <option value="fr" className="bg-white dark:bg-slate-900">Français</option>
-               <option value="es" className="bg-white dark:bg-slate-900">Español</option>
-               <option value="de" className="bg-white dark:bg-slate-900">Deutsch</option>
-               <option value="zh" className="bg-white dark:bg-slate-900">中文</option>
-               <option value="hi" className="bg-white dark:bg-slate-900">हिन्दी</option>
-               <option value="ar" className="bg-white dark:bg-slate-900">العربية</option>
-               <option value="pt" className="bg-white dark:bg-slate-900">Português</option>
-               <option value="ru" className="bg-white dark:bg-slate-900">Русский</option>
-               <option value="ja" className="bg-white dark:bg-slate-900">日本語</option>
+               {Object.keys(TRANSLATIONS).map(key => (
+                 <option key={key} value={key} className="bg-white dark:bg-slate-900">
+                   {TRANSLATIONS[key as Language]._lang_name}
+                 </option>
+               ))}
              </select>
            </div>
            
@@ -282,6 +313,7 @@ const App: React.FC = () => {
            </button>
         </div>
 
+        {/* Chatbot Button */}
         <button 
           onClick={() => {
             setIsChatOpen(true);
@@ -298,6 +330,7 @@ const App: React.FC = () => {
           <span>{isOnline ? t.ask_ai : 'Offline'}</span>
         </button>
 
+        {/* Donate Link */}
         <a 
           href="https://my.moneyfusion.net/6932422bcce144007fbc2721" 
           target="_blank"
@@ -333,6 +366,7 @@ const App: React.FC = () => {
                  wallets={wallets} 
                  transactions={transactions} 
                  dateRange={dateRange}
+                 setDateRange={setDateRange} 
                  onAddWallet={() => setIsWalletModalOpen(true)}
                  lang={lang}
                  onDeleteTransaction={handleDeleteTransaction}
@@ -369,7 +403,7 @@ const App: React.FC = () => {
                       <span>{t.add_transaction}</span>
                     </button>
                  </div>
-                 <TransactionList transactions={transactions} wallets={wallets} lang={lang} onDelete={handleDeleteTransaction} />
+                 <TransactionList transactions={transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())} wallets={wallets} lang={lang} onDelete={handleDeleteTransaction} />
                </div>
              )}
 

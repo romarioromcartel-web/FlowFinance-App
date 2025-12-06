@@ -1,4 +1,5 @@
 
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
@@ -56,4 +57,6 @@ export interface Member {
   email?: string;
   avatar?: string; // Base64 string or URL
   role: 'admin' | 'viewer' | 'editor';
+  isAdmin: boolean;
+  isPremium: boolean;
 }
