@@ -1,5 +1,4 @@
 
-
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
@@ -54,9 +53,6 @@ export interface BudgetLimit {
 export interface Member {
   id: string;
   name: string;
-  email?: string;
   avatar?: string; // Base64 string or URL
   role: 'admin' | 'viewer' | 'editor';
-  isAdmin: boolean;
-  isPremium: boolean;
 }

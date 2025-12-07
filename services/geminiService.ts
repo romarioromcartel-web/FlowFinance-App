@@ -152,8 +152,7 @@ export const getChatModel = (lang: string = 'en') => {
     - Today's Date: ${now.toLocaleDateString()}
     - Current ISO Time: ${now.toISOString()}
     - Language Requirement: You must communicate fluently and naturally in ${targetLanguage}.
-    - Current User Role: Creator (all features unlocked).
-  `;
+  `; 
 
   return ai.chats.create({
     model: 'gemini-2.5-flash',

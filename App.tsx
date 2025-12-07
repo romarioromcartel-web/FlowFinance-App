@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -17,8 +18,7 @@ import {
   Settings,
   WifiOff,
   UserCircle,
-  Heart,
-  Crown
+  Heart
 } from 'lucide-react';
 import { Transaction, Wallet, ViewState, DateRange, TransactionType, Theme, BudgetMethod, BudgetLimit, Member } from './types';
 import { WalletCard } from './components/WalletCard';
@@ -52,7 +52,7 @@ const saveToStorage = (key: string, data: any) => {
 };
 
 const App: React.FC = () => {
-  // Data states (single user, implicitly Creator/Admin/Premium)
+  // Data states (single user)
   const [wallets, setWallets] = useState<Wallet[]>(() => 
     loadFromStorage('flow_wallets', [])
   );
@@ -68,18 +68,15 @@ const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => {
     const loadedMembers = loadFromStorage('flow_members', []);
     if (loadedMembers.length === 0) {
-      // Initialize single 'Creator' user
+      // Initialize single 'Admin' user
       return [{ 
         id: '1', 
         name: 'Me', 
-        email: 'romarioromcartel@gmail.com', // Default creator email (for reference, not login)
-        role: 'admin',
-        isAdmin: true, 
-        isPremium: true 
+        role: 'admin'
       }];
     }
-    // Ensure the single user always has admin/premium status
-    return loadedMembers.map((m, idx) => idx === 0 ? { ...m, isAdmin: true, isPremium: true } : m);
+    // Ensure the single user always has admin role (safety check)
+    return loadedMembers.map((m, idx) => idx === 0 ? { ...m, role: 'admin' } : m);
   });
 
   // UI States
@@ -102,7 +99,7 @@ const App: React.FC = () => {
 
   const t = TRANSLATIONS[lang];
   
-  // Current user is always the first member (the Creator)
+  // Current user is always the first member
   const currentUser: Member = members[0]; 
 
   // --- Persistence Effects ---
@@ -111,9 +108,9 @@ const App: React.FC = () => {
   useEffect(() => saveToStorage('flow_budget_method', budgetMethod), [budgetMethod]);
   useEffect(() => saveToStorage('flow_budget_limits', budgetLimits), [budgetLimits]);
   useEffect(() => {
-    // Ensure the primary member (index 0) is always admin/premium when saving
+    // Ensure the primary member (index 0) always has admin role when saving
     const updatedMembersForSave = members.map((m, idx) => 
-      idx === 0 ? { ...m, isAdmin: true, isPremium: true } : m
+      idx === 0 ? { ...m, role: 'admin' } : m
     );
     saveToStorage('flow_members', updatedMembersForSave);
   }, [members]);
@@ -237,7 +234,7 @@ const App: React.FC = () => {
            </button>
         </div>
         
-        {/* User Profile Summary (Always Creator) */}
+        {/* User Profile Summary */}
         {currentUser && (
           <div className="flex items-center space-x-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0">
@@ -254,8 +251,8 @@ const App: React.FC = () => {
                 {currentUser?.name || "Me"}
               </p>
               <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
-                <Crown className="w-3 h-3 text-purple-400 mr-1" />
-                <span>{t.is_creator}</span>
+                <UserCircle className="w-3 h-3 text-purple-400 mr-1" />
+                <span>Admin</span>
               </div>
             </div>
           </div>

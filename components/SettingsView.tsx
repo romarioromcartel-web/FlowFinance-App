@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Member } from '../types';
 import { TRANSLATIONS, Language } from '../data/locales';
@@ -38,7 +37,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
 
   // 2. Membres State
   const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberEmail, setNewMemberEmail] = useState('');
   
   // 3. Notification State
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -67,7 +65,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
           idx === 0 ? { ...m, name: profileName.trim() } : m
         );
         setMembers(updatedMembers);
-        showNotification(t.profile_updated, 'success');
+        showNotification(t.profile_updated, 'success'); // Re-using profile_updated for avatar
         setIsSaving(false);
     }, 500);
   };
@@ -111,32 +109,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
   // --- Member Handlers ---
   const handleAddMember = () => {
     const name = newMemberName.trim();
-    const email = newMemberEmail.trim();
 
     if (name) {
       const newMember: Member = {
         id: Date.now().toString(),
         name: name,
-        email: email,
-        role: 'editor',
-        isAdmin: false, 
-        isPremium: false,
+        role: 'editor', // Other added members are editors by default
       };
       setMembers([...members, newMember]);
 
-      if (email) {
-        showNotification(`${t.invite_sent} ${email}`, 'info');
-      } else {
-        showNotification(`${name} ${t.member_added}`, 'success');
-      }
+      showNotification(`${name} ${t.invite_sent}`, 'info'); // Simplified message
       setNewMemberName('');
-      setNewMemberEmail('');
     }
   };
 
   const handleRemoveMember = (id: string, name: string) => {
+    // Only allow removing if more than 1 member (cannot remove self as admin)
     if (members.length > 1) {
-      if (window.confirm(t.delete_confirm)) { 
+      if (window.confirm(t.delete_confirm)) { // Using t.delete_confirm for generic confirmation
         setMembers(members.filter(m => m.id !== id));
         showNotification(`${name} ${t.member_removed}`, 'error');
       }
@@ -224,9 +214,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
               />
             </div>
             <div className="flex items-center space-x-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{t.premium_status_label}:</span>
                 <span className="flex items-center text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full">
-                    <Crown className="w-3 h-3 mr-1" /> {t.is_creator}
+                    <UserCircle className="w-3 h-3 mr-1" /> Admin
                 </span>
             </div>
             <button 
@@ -275,19 +264,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <input 
               type="text" 
               placeholder={t.member_name}
               value={newMemberName}
               onChange={(e) => setNewMemberName(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-            />
-            <input 
-              type="email" 
-              placeholder={t.member_email}
-              value={newMemberEmail}
-              onChange={(e) => setNewMemberEmail(e.target.value)}
               className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
@@ -311,7 +293,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ members, setMembers,
                    )}
                   <div>
                     <p className="font-medium text-slate-800 dark:text-white">{member.name}</p>
-                    {member.email && <p className="text-xs text-slate-500 flex items-center"><Mail className="w-3 h-3 mr-1" />{member.email}</p>}
                     <span className="flex items-center text-xs text-slate-500 dark:text-slate-400">
                         <UserCircle className="w-3 h-3 mr-1" />
                         <span>{t.member}</span>

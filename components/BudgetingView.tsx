@@ -1,6 +1,5 @@
 
 
-
 import React, { useState } from 'react';
 import { Transaction, TransactionType, BudgetMethod, BudgetLimit } from '../types';
 import { TRANSLATIONS, Language } from '../data/locales';

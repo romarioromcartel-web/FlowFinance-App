@@ -47,7 +47,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   useEffect(() => {
     if (isOpen && !chatSession && isOnline) {
       try {
-        const chat = getChatModel(lang);
+        const chat = getChatModel(lang); 
         setChatSession(chat);
         setSessionError(null);
         setMessages([{

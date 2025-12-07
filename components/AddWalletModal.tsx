@@ -1,11 +1,9 @@
 
 
-
 import React, { useState } from 'react';
-import { X, Crown } from 'lucide-react';
+import { X } from 'lucide-react'; 
 import { CURRENCIES } from '../data/currencies';
 import { TRANSLATIONS, Language } from '../data/locales';
-import { Wallet } from '../types';
 
 interface AddWalletModalProps {
   isOpen: boolean;
